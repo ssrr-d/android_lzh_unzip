@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.lzh">
+
+    <!-- Android API 21以上をサポート -->
+    <uses-sdk
+        android:minSdkVersion="21"
+        android:targetSdkVersion="34" />
+
+    <!-- 内部ストレージアクセス（権限不要） -->
+    <!-- このライブラリは内部ストレージのみを使用するため、特別な権限は不要 -->
+
+    <application>
+        <!-- ライブラリ情報をメタデータとして追加 -->
+        <meta-data
+            android:name="com.example.lzh.version"
+            android:value="1.0.0" />
+        
+        <meta-data
+            android:name="com.example.lzh.min_api_level"
+            android:value="21" />
+        
+        <meta-data
+            android:name="com.example.lzh.target_api_level"
+            android:value="34" />
+    </application>
+
+</manifest>
