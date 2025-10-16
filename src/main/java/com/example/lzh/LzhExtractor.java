@@ -287,15 +287,30 @@ public class LzhExtractor {
      * @throws FileNotFoundException ファイルが見つからない場合
      */
     public void extractFile(File lzhFile, String fileName, File outputDir) throws LzhException {
-        // 入力検証
-        validateFileInput(lzhFile);
-        validateFileNameInput(fileName);
-        validateOutputDirectory(outputDir);
+        ErrorContext context = new ErrorContext("個別ファイル抽出")
+            .withInputSource(lzhFile != null ? lzhFile.getAbsolutePath() : "null")
+            .withFileName(fileName)
+            .withOutputPath(outputDir != null ? outputDir.getAbsolutePath() : "null");
         
-        try (FileInputStream fileInputStream = new FileInputStream(lzhFile)) {
-            extractFile(fileInputStream, fileName, outputDir);
+        LzhLogger.logOperationStart(TAG, "個別ファイル抽出", 
+            "ファイル: " + fileName + ", 入力: " + (lzhFile != null ? lzhFile.getAbsolutePath() : "null"));
+        
+        try {
+            // 入力検証
+            validateFileInput(lzhFile, context);
+            validateFileNameInput(fileName);
+            validateOutputDirectory(outputDir, context);
+            
+            try (FileInputStream fileInputStream = new FileInputStream(lzhFile)) {
+                extractFile(fileInputStream, fileName, outputDir);
+                LzhLogger.logOperationSuccess(TAG, "個別ファイル抽出", "ファイル: " + fileName);
+            }
         } catch (IOException e) {
-            throw new LzhException("Failed to read LZH file: " + lzhFile.getAbsolutePath(), e);
+            LzhLogger.logOperationFailure(TAG, "個別ファイル抽出", "I/Oエラー", e);
+            throw new LzhException("Failed to read LZH file: " + lzhFile.getAbsolutePath(), context, e);
+        } catch (Exception e) {
+            LzhLogger.logOperationFailure(TAG, "個別ファイル抽出", "エラー", e);
+            throw ComprehensiveErrorHandler.handleException(e, "個別ファイル抽出", context);
         }
     }
     
@@ -308,20 +323,33 @@ public class LzhExtractor {
      * @throws FileNotFoundException ファイルが見つからない場合
      */
     public void extractFile(InputStream inputStream, String fileName, File outputDir) throws LzhException {
-        // 入力検証
-        validateStreamInput(inputStream);
-        validateFileNameInput(fileName);
-        validateOutputDirectory(outputDir);
+        ErrorContext context = new ErrorContext("個別ファイル抽出")
+            .withInputSource("InputStream")
+            .withFileName(fileName)
+            .withOutputPath(outputDir != null ? outputDir.getAbsolutePath() : "null");
+        
+        LzhLogger.logOperationStart(TAG, "個別ファイル抽出（ストリーム）", "ファイル: " + fileName);
         
         try {
+            // 入力検証
+            validateStreamInput(inputStream, context);
+            validateFileNameInput(fileName);
+            validateOutputDirectory(outputDir, context);
+            
             // 出力ディレクトリを作成
             FileManager.createDirectories(outputDir);
             
             // 指定されたファイルを検索して解凍
-            extractSpecificFile(inputStream, fileName, outputDir);
+            extractSpecificFile(inputStream, fileName, outputDir, context);
+            
+            LzhLogger.logOperationSuccess(TAG, "個別ファイル抽出（ストリーム）", "ファイル: " + fileName);
             
         } catch (IOException e) {
-            throw new LzhException("Failed to extract file from LZH archive", e);
+            LzhLogger.logOperationFailure(TAG, "個別ファイル抽出（ストリーム）", "I/Oエラー", e);
+            throw new LzhException("Failed to extract file from LZH archive", context, e);
+        } catch (Exception e) {
+            LzhLogger.logOperationFailure(TAG, "個別ファイル抽出（ストリーム）", "エラー", e);
+            throw ComprehensiveErrorHandler.handleException(e, "個別ファイル抽出（ストリーム）", context);
         }
     }
     
@@ -334,15 +362,31 @@ public class LzhExtractor {
      * @throws FileNotFoundException ファイルが見つからない場合
      */
     public void extractFile(byte[] lzhData, String fileName, File outputDir) throws LzhException {
-        // 入力検証
-        validateByteArrayInput(lzhData);
-        validateFileNameInput(fileName);
-        validateOutputDirectory(outputDir);
+        ErrorContext context = new ErrorContext("個別ファイル抽出")
+            .withInputSource("byte array")
+            .withFileName(fileName)
+            .withFileSize(lzhData != null ? (long) lzhData.length : 0L)
+            .withOutputPath(outputDir != null ? outputDir.getAbsolutePath() : "null");
         
-        try (ByteArrayInputStream byteInputStream = new ByteArrayInputStream(lzhData)) {
-            extractFile(byteInputStream, fileName, outputDir);
+        LzhLogger.logOperationStart(TAG, "個別ファイル抽出（バイト配列）", 
+            "ファイル: " + fileName + ", データサイズ: " + (lzhData != null ? lzhData.length : 0) + " bytes");
+        
+        try {
+            // 入力検証
+            validateByteArrayInput(lzhData, context);
+            validateFileNameInput(fileName);
+            validateOutputDirectory(outputDir, context);
+            
+            try (ByteArrayInputStream byteInputStream = new ByteArrayInputStream(lzhData)) {
+                extractFile(byteInputStream, fileName, outputDir);
+                LzhLogger.logOperationSuccess(TAG, "個別ファイル抽出（バイト配列）", "ファイル: " + fileName);
+            }
         } catch (IOException e) {
-            throw new LzhException("Failed to extract file from LZH archive byte array", e);
+            LzhLogger.logOperationFailure(TAG, "個別ファイル抽出（バイト配列）", "I/Oエラー", e);
+            throw new LzhException("Failed to extract file from LZH archive byte array", context, e);
+        } catch (Exception e) {
+            LzhLogger.logOperationFailure(TAG, "個別ファイル抽出（バイト配列）", "エラー", e);
+            throw ComprehensiveErrorHandler.handleException(e, "個別ファイル抽出（バイト配列）", context);
         }
     }
     
@@ -486,11 +530,24 @@ public class LzhExtractor {
      */
     private void validateFileNameInput(String fileName) throws InvalidArchiveException {
         if (fileName == null) {
-            throw new InvalidArchiveException("File name cannot be null");
+            LzhLogger.e(TAG, "ファイル名がnullです");
+            throw InvalidArchiveException.forInputValidation("File name cannot be null", 
+                new ErrorContext("ファイル名検証").withFileName("null"));
         }
         if (fileName.trim().isEmpty()) {
-            throw new InvalidArchiveException("File name cannot be empty");
+            LzhLogger.e(TAG, "ファイル名が空です");
+            throw InvalidArchiveException.forInputValidation("File name cannot be empty", 
+                new ErrorContext("ファイル名検証").withFileName("empty"));
         }
+        
+        // ファイル名の安全性チェック
+        if (fileName.contains("..") || fileName.contains("\\") || fileName.startsWith("/")) {
+            LzhLogger.logSecurityWarning(TAG, "安全でないファイル名", fileName);
+            throw InvalidArchiveException.forInputValidation("Unsafe file name: " + fileName, 
+                new ErrorContext("ファイル名検証").withFileName(fileName));
+        }
+        
+        LzhLogger.d(TAG, "ファイル名検証完了: " + fileName);
     }
     
     /**
@@ -498,59 +555,95 @@ public class LzhExtractor {
      * @param inputStream 入力ストリーム
      * @param targetFileName 抽出対象のファイル名
      * @param outputDir 出力ディレクトリ
+     * @param context エラーコンテキスト
      * @throws IOException I/Oエラー
      * @throws LzhException 解凍エラー
      * @throws FileNotFoundException ファイルが見つからない場合
      */
-    private void extractSpecificFile(InputStream inputStream, String targetFileName, File outputDir) 
+    private void extractSpecificFile(InputStream inputStream, String targetFileName, File outputDir, ErrorContext context) 
             throws IOException, LzhException {
         
         LzhEntry entry;
         boolean fileFound = false;
         int entryCount = 0;
         
-        logger.info("Searching for file: " + targetFileName + " in archive");
+        LzhLogger.i(TAG, "ファイル検索開始: " + targetFileName);
         
-        // アーカイブ内の各エントリを順次処理
-        while ((entry = LzhHeader.parseHeader(inputStream)) != null) {
-            entryCount++;
-            logger.fine("Processing entry " + entryCount + ": " + entry.getFileName());
+        try {
+            // アーカイブ内の各エントリを順次処理
+            while ((entry = LzhHeader.parseHeader(inputStream)) != null) {
+                entryCount++;
+                
+                ErrorContext entryContext = context.copy()
+                    .withData("entryNumber", entryCount)
+                    .withData("currentEntry", entry.getFileName());
+                
+                LzhLogger.d(TAG, "エントリ処理 " + entryCount + ": " + entry.getFileName());
+                
+                // ファイル名が一致するかチェック
+                if (entry.getFileName().equals(targetFileName)) {
+                    fileFound = true;
+                    LzhLogger.i(TAG, "対象ファイル発見: " + targetFileName + 
+                               " (" + entry.getCompressionMethod() + ", " + entry.getOriginalSize() + " bytes)");
+                    
+                    // エラーコンテキストを更新
+                    entryContext.withCompressionMethod(entry.getCompressionMethod())
+                               .withFileSize(entry.getOriginalSize())
+                               .withData("compressedSize", entry.getCompressedSize());
+                    
+                    // ファイルパスの安全性をチェック
+                    if (!FileManager.isValidOutputPath(outputDir, entry.getFileName())) {
+                        LzhLogger.logSecurityWarning(TAG, "安全でないファイルパス", entry.getFileName());
+                        throw new LzhException("Unsafe file path: " + entry.getFileName(), entryContext);
+                    }
+                    
+                    // 出力ファイルパスを作成
+                    File outputFile;
+                    try {
+                        outputFile = FileManager.createSafeFilePath(outputDir, entry.getFileName());
+                    } catch (IOException e) {
+                        LzhLogger.e(TAG, "出力ファイルパス作成失敗", e);
+                        throw new LzhException("Failed to create output file path", entryContext, e);
+                    }
+                    
+                    try {
+                        // エントリを解凍
+                        extractSingleEntry(inputStream, outputFile, entry, entryContext);
+                        LzhLogger.i(TAG, "解凍成功: " + entry.getFileName());
+                        return; // ファイルが見つかって解凍完了したので終了
+                    } catch (Exception e) {
+                        LzhLogger.e(TAG, "エントリ解凍失敗: " + entry.getFileName(), e);
+                        throw new LzhException("Failed to extract " + entry.getFileName(), entryContext, e);
+                    }
+                } else {
+                    // 対象ファイルではないのでデータをスキップ
+                    try {
+                        skipEntryData(inputStream, entry.getCompressedSize());
+                        LzhLogger.d(TAG, "エントリスキップ: " + entry.getFileName());
+                    } catch (IOException e) {
+                        LzhLogger.w(TAG, "エントリデータスキップ失敗: " + entry.getFileName(), e);
+                        throw CorruptedArchiveException.forIncompleteData(
+                            entry.getCompressedSize(), 0, entryContext);
+                    }
+                }
+            }
             
-            // ファイル名が一致するかチェック
-            if (entry.getFileName().equals(targetFileName)) {
-                fileFound = true;
-                logger.info("Found target file: " + targetFileName + 
-                           " (" + entry.getCompressionMethod() + ", " + entry.getOriginalSize() + " bytes)");
-                
-                // ファイルパスの安全性をチェック
-                if (!FileManager.isValidOutputPath(outputDir, entry.getFileName())) {
-                    throw new LzhException("Unsafe file path: " + entry.getFileName());
+            // ファイルが見つからなかった場合
+            if (!fileFound) {
+                if (entryCount == 0) {
+                    LzhLogger.e(TAG, "アーカイブに有効なエントリが見つかりません");
+                    throw InvalidArchiveException.forEmptyArchive(context);
+                } else {
+                    LzhLogger.e(TAG, "ファイルが見つかりません: " + targetFileName + " (検索したエントリ数: " + entryCount + ")");
+                    throw new com.example.lzh.exception.FileNotFoundException(
+                        "File not found in archive: " + targetFileName, 
+                        context.withData("searchedEntries", entryCount));
                 }
-                
-                // 出力ファイルパスを作成
-                File outputFile = FileManager.createSafeFilePath(outputDir, entry.getFileName());
-                
-                try {
-                    // エントリを解凍
-                    extractSingleEntry(inputStream, outputFile, entry);
-                    logger.info("Successfully extracted: " + entry.getFileName());
-                    return; // ファイルが見つかって解凍完了したので終了
-                } catch (Exception e) {
-                    throw new LzhException("Failed to extract " + entry.getFileName() + ": " + e.getMessage(), e);
-                }
-            } else {
-                // 対象ファイルではないのでデータをスキップ
-                skipEntryData(inputStream, entry.getCompressedSize());
             }
-        }
-        
-        // ファイルが見つからなかった場合
-        if (!fileFound) {
-            if (entryCount == 0) {
-                throw new InvalidArchiveException("No valid entries found in LZH archive");
-            } else {
-                throw new FileNotFoundException("File not found in archive: " + targetFileName);
-            }
+            
+        } catch (IOException e) {
+            LzhLogger.e(TAG, "アーカイブ読み取りエラー", e);
+            throw CorruptedArchiveException.forDataIntegrityError("Archive reading failed during file search", context);
         }
     }
     
